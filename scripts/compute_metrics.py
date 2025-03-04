@@ -2,6 +2,15 @@ from collections import Counter
 import argparse
 import os
 import json
+import warnings
+warnings.filterwarnings('ignore', message='No Pauling electronegativity')
+
+current_directory = os.getcwd()
+
+print("当前默认路径:", current_directory)
+import sys
+sys.path.append('D:\github\CDVAE\cdvae\scripts')
+
 
 import numpy as np
 from pathlib import Path

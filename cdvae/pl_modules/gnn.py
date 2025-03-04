@@ -4,7 +4,7 @@
 import torch
 import torch.nn as nn
 from torch_scatter import scatter
-from torch_geometric.nn.acts import swish
+from torch_geometric.nn.resolver import swish
 from torch_geometric.nn.inits import glorot_orthogonal
 from torch_geometric.nn.models.dimenet import (
     BesselBasisLayer,
@@ -13,14 +13,12 @@ from torch_geometric.nn.models.dimenet import (
     SphericalBasisLayer,
 )
 from torch_sparse import SparseTensor
-
 from cdvae.common.data_utils import (
     get_pbc_distances,
     frac_to_cart_coords,
     radius_graph_pbc_wrapper,
 )
 from cdvae.pl_modules.gemnet.gemnet import GemNetT
-
 try:
     import sympy as sym
 except ImportError:

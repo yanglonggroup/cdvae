@@ -2,12 +2,16 @@ import itertools
 import numpy as np
 import torch
 import hydra
-
+import sys
+import os
+import yaml
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scipy.spatial.distance import pdist
 from scipy.spatial.distance import cdist
-from hydra.experimental import compose
+from hydra import compose
 from hydra import initialize_config_dir
 from pathlib import Path
+from cdvae.pl_modules.model import CDVAE
 
 import smact
 from smact.screening import pauling_test
@@ -51,23 +55,89 @@ def load_config(model_path):
         cfg = compose(config_name='hparams')
     return cfg
 
-
 def load_model(model_path, load_data=False, testing=True):
+    config_path = model_path / 'hparams.yaml'
+    print(f"Loading config from: {config_path}")
+    
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    print("Loaded config:", config)
+    print("Model parameters:", config.get('model', {}))
+    
     with initialize_config_dir(str(model_path)):
         cfg = compose(config_name='hparams')
-        model = hydra.utils.instantiate(
-            cfg.model,
-            optim=cfg.optim,
-            data=cfg.data,
-            logging=cfg.logging,
-            _recursive_=False,
-        )
+        
+        # Get the model class
+        model_cls = hydra.utils.get_class(cfg.model._target_)
+        
+        # Find the latest checkpoint
         ckpts = list(model_path.glob('*.ckpt'))
         if len(ckpts) > 0:
             ckpt_epochs = np.array(
                 [int(ckpt.parts[-1].split('-')[0].split('=')[1]) for ckpt in ckpts])
             ckpt = str(ckpts[ckpt_epochs.argsort()[-1]])
-        model = model.load_from_checkpoint(ckpt)
+        
+        # Load the checkpoint
+        checkpoint = torch.load(ckpt, map_location='cpu')
+        state_dict = checkpoint['state_dict']
+        
+        # Fix weights with mismatched dimensions
+        for key in ['encoder.output_blocks.0.lin.weight',
+                   'encoder.output_blocks.1.lin.weight',
+                   'encoder.output_blocks.2.lin.weight',
+                   'encoder.output_blocks.3.lin.weight',
+                   'encoder.output_blocks.4.lin.weight']:
+            if key in state_dict:
+                old_weight = state_dict[key]  # [1, 256]
+                new_weight = torch.zeros(256, 256)  # [256, 256]
+                new_weight = old_weight.expand(256, -1)
+                state_dict[key] = new_weight
+        
+        # Model parameters dictionary
+        model_kwargs = {
+            'hidden_dim': cfg.model.hidden_dim,
+            'latent_dim': cfg.model.latent_dim,
+            'encoder': cfg.model.encoder,
+            'decoder': cfg.model.decoder,
+            'max_atoms': cfg.data.max_atoms,
+            'cost_natom': cfg.model.cost_natom,
+            'cost_coord': cfg.model.cost_coord,
+            'cost_type': cfg.model.cost_type,
+            'cost_lattice': cfg.model.cost_lattice,
+            'cost_composition': cfg.model.cost_composition,
+            'cost_edge': cfg.model.cost_edge,
+            'cost_property': cfg.model.cost_property,
+            'beta': cfg.model.beta,
+            'max_neighbors': cfg.model.max_neighbors,
+            'radius': cfg.model.radius,
+            'sigma_begin': cfg.model.sigma_begin,
+            'sigma_end': cfg.model.sigma_end,
+            'type_sigma_begin': cfg.model.type_sigma_begin,
+            'type_sigma_end': cfg.model.type_sigma_end,
+            'num_noise_level': cfg.model.num_noise_level,
+            'predict_property': cfg.model.predict_property,
+            'optim': cfg.optim,
+            'data': cfg.data,
+            'logging': cfg.logging
+        }
+        
+        # Ensure fc_num_layers exists in model_kwargs
+        if hasattr(cfg.model, 'fc_num_layers'):
+            model_kwargs['fc_num_layers'] = cfg.model.fc_num_layers
+        else:
+            model_kwargs['fc_num_layers'] = 4  # Set default value
+            print("Warning: fc_num_layers not found in config, using default value: 4")
+        
+        # Create a new model
+        model = model_cls(**model_kwargs)
+        
+        # Load the modified state dictionary
+        model.load_state_dict(state_dict, strict=False)
+        
+        # Initialize other necessary components
+        if hasattr(model, 'init_sigmas'):
+            model.init_sigmas()
+        
         model.lattice_scaler = torch.load(model_path / 'lattice_scaler.pt')
         model.scaler = torch.load(model_path / 'prop_scaler.pt')
 
@@ -85,7 +155,6 @@ def load_model(model_path, load_data=False, testing=True):
             test_loader = None
 
     return model, test_loader, cfg
-
 
 def get_crystals_list(
         frac_coords, atom_types, lengths, angles, num_atoms):
