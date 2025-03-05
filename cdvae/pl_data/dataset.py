@@ -11,7 +11,6 @@ from cdvae.common.utils import PROJECT_ROOT
 from cdvae.common.data_utils import (
     preprocess, preprocess_tensors, add_scaled_lattice_prop)
 
-
 class CrystDataset(Dataset):
     def __init__(self, name: ValueNode, path: ValueNode,
                  prop: ValueNode, niggli: ValueNode, primitive: ValueNode,
@@ -123,7 +122,7 @@ class TensorCrystDataset(Dataset):
         return f"TensorCrystDataset(len: {len(self.cached_data)})"
 
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default", version_base="1.3")
 def main(cfg: omegaconf.DictConfig):
     from torch_geometric.data import Batch
     from cdvae.common.data_utils import get_scaler_from_data_list

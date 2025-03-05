@@ -59,7 +59,7 @@ class CrystDataModule(pl.LightningDataModule):
     def get_scaler(self, scaler_path):
         # Load once to compute property scaler
         if scaler_path is None:
-            train_dataset = hydra.utils.instantiate(self.datasets.train)
+            train_dataset = hydra.utils.instantiate(self.datasets.train) # root determined in yaml
             self.lattice_scaler = get_scaler_from_data_list(
                 train_dataset.cached_data,
                 key='scaled_lattice')
@@ -139,7 +139,7 @@ class CrystDataModule(pl.LightningDataModule):
         )
 
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default", version_base="1.3")
 def main(cfg: omegaconf.DictConfig):
     datamodule: pl.LightningDataModule = hydra.utils.instantiate(
         cfg.data.datamodule, _recursive_=False

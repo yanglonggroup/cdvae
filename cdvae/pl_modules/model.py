@@ -1,5 +1,4 @@
 from typing import Any, Dict
-
 import hydra
 import numpy as np
 import omegaconf
@@ -132,10 +131,11 @@ class CrystGNN_Supervise(BaseModule):
             })
         return log_dict, loss
 
-
 class CDVAE(BaseModule):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        print("Received parameters:", kwargs)
+        print("self.hparams:", self.hparams) # edit to see params
 
         self.encoder = hydra.utils.instantiate(
             self.hparams.encoder, num_targets=self.hparams.latent_dim)
@@ -181,8 +181,7 @@ class CDVAE(BaseModule):
 
     def reparameterize(self, mu, logvar):
         """
-        Reparameterization trick to sample from N(mu, var) from
-        N(0,1).
+        Reparameterization trick to sample from N(mu, var) from N(0,1).
         :param mu: (Tensor) Mean of the latent Gaussian [B x D]
         :param logvar: (Tensor) Standard deviation of the latent Gaussian [B x D]
         :return: (Tensor) [B x D]
@@ -632,7 +631,7 @@ class CDVAE(BaseModule):
         return log_dict, loss
 
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default", version_base="1.1")
 def main(cfg: omegaconf.DictConfig):
     model: pl.LightningModule = hydra.utils.instantiate(
         cfg.model,

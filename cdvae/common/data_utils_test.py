@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 import torch
 from torch_scatter.scatter import scatter
-from cdvae.common import data_utils
+import data_utils
 
 
 def test_lattice_params_matrix():
